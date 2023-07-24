@@ -507,6 +507,8 @@ public int size() {
 
 ### 六、jdk1.7 get方法分析
 
+get 时并未加锁，用了 UNSAFE 方法保证了可见性，扩容过程中，get 先发生就从旧表取内容，get 后发生就从新 表取内容
+
 #### 1、源码分析
 ```java
 public V get(Object key) {
