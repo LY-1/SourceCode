@@ -504,3 +504,34 @@ public int size() {
 }
 ```
 > 说明：市面上很多讲ConcurrentHashMap的源码分析课程，大多都是以营销为目的，并没有完整讲解添加安全和扩容安全，就目前我所知，所有公开课程中，没有任何课程讲解jdk1.8多线程扩容效率的改进方案。
+
+### 六、jdk1.7 get方法分析
+
+####1、源码分析
+```java
+public V get(Object key) {
+    Segment<K,V> s; // manually integrate access methods to reduce overhead
+    HashEntry<K,V>[] tab;
+    // 计算key值
+    int h = hash(key);
+    // 计算key值所在的Segment数组下标位置
+    long u = (((h >>> segmentShift) & segmentMask) << SSHIFT) + SBASE;
+    // 下标位置存在segment 并且 segment中存在HashEntry数组
+    if ((s = (Segment<K,V>)UNSAFE.getObjectVolatile(segments, u)) != null && (tab = s.table) != null) {
+    	// 先获取HashEntry数组下标位置的链表头，遍历链表中有没有相同的key值，有就返回对应的value
+        for (HashEntry<K,V> e = (HashEntry<K,V>) UNSAFE.getObjectVolatile (tab, ((long)(((tab.length - 1) & h)) << TSHIFT) + TBASE); e != null; e = e.next) {
+            K k;
+            if ((k = e.key) == key || (e.hash == h && key.equals(k)))
+                return e.value;
+        }
+    }
+    // 没有就返回null
+    return null;
+
+```
+
+ps：get方法时碰上扩容？
+
+在某些情况下，`get` 方法可能会返回 `null`，即使该键在映射中实际上是存在的。
+
+`ConcurrentHashMap` 在 1.7 版本中使用了分段锁（Segment-Based Locking）来实现并发访问，而在进行扩容时，会在每个段（Segment）中的元素进行转移。在转移的过程中，某些键的映射可能已经完成了转移，但是该段的状态可能还未更新为新的数据结构，导致在旧的段中无法找到键。
